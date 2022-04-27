@@ -1,4 +1,5 @@
-# ![logo](./Images/moss.png) Moss Operating System
+![logo](./Images/moss.png)
+# Moss Operating System
 
 A hobbyist operating system written from scratch. A rewrite of MisraOS basically.
 Trying a less object oriented approach this time. I also hope that this will

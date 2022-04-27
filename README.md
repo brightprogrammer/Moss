@@ -1,3 +1,3 @@
 # Moss Operating System
 
-Nothing much to read yet... Work in progress...
+![First print to screen - 28/04/2022][Images/1-DrawString.png]

@@ -6,6 +6,8 @@
 
 // stivale 2 header specification
 #include "stivale2.h"
+#include "Common.hpp"
+#include "Renderer.hpp"
 
 // placeholder for NULL value in uintptr_t instead of using 0 again and again
 #define NULLADDR 0
@@ -84,6 +86,12 @@ void *stivale2_get_tag(struct stivale2_struct *stivale2_struct, uint64_t id) {
     }
 }
 
+void  Halt(){
+    while(true){
+        asm("hlt");
+    }
+}
+
 // The following will be our kernel's entry point.
 extern "C" { // stop compiler from mangling function name
     void KernelEntry(struct stivale2_struct *stivale2_struct) {
@@ -96,17 +104,15 @@ extern "C" { // stop compiler from mangling function name
         // Check if the tag was actually found.
         if (framebuffer_tag == NULL) {
             // It wasn't found, just hang...
-            for (;;) {
-                asm ("hlt");
-            }
+            Halt();
         }
 
-        // get address of framebuffer
-        uint32_t* fb_addr = (uint32_t*)framebuffer_tag->framebuffer_addr;
+        // load framebuffer info
+        LoadFramebufferInfo(framebuffer_tag);
+
+        DrawString("Moss Operating System!", 10, 10);
 
         // We're done, just hang...
-        for (;;) {
-            asm ("hlt");
-        }
+        Halt();
     }
 }

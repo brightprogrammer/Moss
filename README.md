@@ -1,4 +1,4 @@
-# Moss Operating System
+# ![logo](./Images/moss.png) Moss Operating System
 
 A hobbyist operating system written from scratch. A rewrite of MisraOS basically.
 Trying a less object oriented approach this time. I also hope that this will
@@ -15,3 +15,4 @@ taking a screenshot and uploading it on every new manjor feature added.
 - First print to screen on 28/04/2022
 ![First print to screen - 28/04/2022](./Images/1-DrawString.png)
 
+Logo source : [Moss icons created by Freepik - Flaticon](https://www.flaticon.com/free-icons/moss)

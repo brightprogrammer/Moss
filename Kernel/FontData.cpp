@@ -1,20 +1,17 @@
 /**
- * @file Renderer.cpp
+ * @file FontData.cpp
  * @author Siddharth Mishra (brightprogrammer)
  * @date 04/27/22
  * @modified 04/28/22
- * @brief Rendering functions. Provides basic rendering support to kernel.
+ * @brief Provides a font bitmap for the kernel to use.
  * @copyright MIT License 2022 Siddharth Mishra
  * */
 
-#include "Renderer.hpp"
-#include "String.hpp"
 
-// framebuffer info
-uint32_t FRAMEBUFFER_WIDTH = 0;
-uint32_t FRAMEBUFFER_HEIGHT = 0;
-uint32_t FRAMEBUFFER_PITCH = 0;
-uint32_t* framebuffer = 0;
+#ifndef FONTDATA_H_
+#define FONTDATA_H_
+
+#include <cstdint>
 
 uint8_t FONT_WIDTH = 8;
 uint8_t FONT_HEIGHT = 8;
@@ -278,94 +275,5 @@ uint8_t FONT_DATA[2048] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-#define TAB_WIDTH 4
 
-// load framebuffer info
-void LoadFramebufferInfo(stivale2_struct_tag_framebuffer* fb_tag){
-    FRAMEBUFFER_WIDTH = fb_tag->framebuffer_width;
-    FRAMEBUFFER_HEIGHT = fb_tag->framebuffer_height;
-    FRAMEBUFFER_PITCH = fb_tag->framebuffer_pitch;
-    framebuffer = reinterpret_cast<uint32_t*>(fb_tag->framebuffer_addr);
-}
-
-// clear a rectangle on sreen with given color
-void ClearScreen(uint32_t color,
-                 uint32_t startx, uint32_t starty,
-                 uint32_t stopx, uint32_t stopy){
-    for(uint32_t r = starty; r <= stopy; r++){
-        for(uint32_t c = startx; c <= stopx; c++){
-            framebuffer[r * FRAMEBUFFER_WIDTH + c] = color;
-        }
-    }
-}
-
-// draw character on screen at given posn
-void DrawCharacter(char c, uint32_t& x, uint32_t& y,
-                   uint32_t fgColor, uint32_t bgColor){
-    // asm code to jump to same position again and again
-    // asm volatile (".byte 0xeb, 0xef");
-
-    // check for any line change
-    if(c == '\n'){
-        x = 0;
-        y += FONT_HEIGHT;
-        return;
-    }else if(c == '\b'){
-        x -= FONT_WIDTH;
-        return;
-    }else if(c == ' '){
-        x += FONT_WIDTH;
-        return;
-    }else if(c == '\t'){
-        x += TAB_WIDTH*FONT_WIDTH;
-        return;
-    }
-
-    // on crossing width
-    // reset to new line and 0 xpos
-    // no need to keep printing if wrap is disabled
-    if(x >= FRAMEBUFFER_WIDTH){
-        x = 0;
-        y += FONT_HEIGHT;
-    }
-
-    // on crossing height
-    // reset to starting of screen
-    // no need to keep printing if wrap is disabled
-    if(y >= FRAMEBUFFER_HEIGHT){
-        x = 0;
-        y = 0;
-    }
-
-    // get bitmap for required character
-    uint8_t* font_bitmap = FONT_DATA + c * FONT_HEIGHT;
-
-    // draw char
-    for(uint32_t i = 0; i < FONT_HEIGHT; i++){
-        uint8_t row_bitmap = font_bitmap[i];
-        for(uint32_t j = 0; j < FONT_WIDTH; j++){
-            // calculate write address
-            uint32_t write_addr = (x + j) + (y + i) * FRAMEBUFFER_WIDTH;
-
-            // if bit is set then fill foreground colour else fill background colour
-            // 8 - j because of endianness. Bits are stored in little endian format
-            if(row_bitmap & (1 << (8 - j))){
-                framebuffer[write_addr] = fgColor;
-            }else{
-                framebuffer[write_addr] = bgColor;
-            }
-        }
-    }
-
-    // update position
-    x += FONT_WIDTH;
-}
-
-// draw a given string at given position
-void DrawString(const char* str, uint32_t& x, uint32_t& y, bool wrap){
-    size_t len = strlen(str);
-
-    for(size_t i = 0; i < len; i++){
-        DrawCharacter(str[i], x, y);
-    }
-}
+#endif // FONTDATA_H_

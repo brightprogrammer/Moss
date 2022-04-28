@@ -1,8 +1,22 @@
+/**
+ * @file Renderer.cpp
+ * @author Siddharth Mishra (brightprogrammer)
+ * @date 04/27/22
+ * @modified 04/28/22
+ * @brief Rendering functions. Provides basic rendering support to kernel.
+ * @copyright MIT License 2022 Siddharth Mishra
+ * */
+
 #ifndef RENDERER_H_
 #define RENDERER_H_
 
 #include "Common.hpp"
 #include "stivale2.h"
+
+// export framebuffer information
+extern uint32_t FRAMEBUFFER_WIDTH;
+extern uint32_t FRAMEBUFFER_HEIGHT;
+extern uint32_t FRAMEBUFFER_PITCH;
 
 /**
  * @brief Helper function to generate color value from
@@ -51,19 +65,22 @@ void ClearScreen(uint32_t color = 0,
  * @param fgColor Foreground color. Color of text.
  * @param bgColor Background Color. Color of background of text.
  * */
-void DrawCharacter(char c, uint32_t x, uint32_t y,
+void DrawCharacter(char c, uint32_t& x, uint32_t& y,
                    uint32_t fgColor = Color(0xff, 0xff, 0xff, 0xff), // white
                    uint32_t bgColor = Color(0, 0, 0, 0)); // black
 
 /**
- * @brief Draw string on screen.
+ * @brief Draw string on screen. Note that this function takes x and y
+ * positions as reference and hence is capable of changing their values.
+ * This function will automatically change value of x and y
  *
  * @param string String to draw onto screen
  * @param x X coordinate of where to start drawing from.
  * @param y Y coordinate of where to start drawing from.
- * @param wrap Whether to wrap string to new line if cursor reaches end of
+ * @param wrap Whether to wrap string to new line if cursor
+ * reaches end of line. By default line wrap is enabled.
  * screen width during drawing.
  * */
-void DrawString(const char* string, uint32_t x, uint32_t y, bool wrap = true);
+void DrawString(const char* string, uint32_t& x, uint32_t& y, bool wrap = true);
 
 #endif // RENDERER_H_

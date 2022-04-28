@@ -1,6 +1,6 @@
 # add all Kernel sources here
 # recurisve search may be slower sometimes so just hardcode filenames
-set(KERNEL_SRCS "KernelEntry.cpp" "Renderer.cpp" "String.cpp")
+set(KERNEL_SRCS "KernelEntry.cpp" "Renderer.cpp" "String.cpp" "Printf.cpp")
 
 # make Kernel as executable
 add_executable(Kernel ${KERNEL_SRCS})

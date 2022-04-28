@@ -1,3 +1,11 @@
+/**
+ * @file KernelEntry.cpp
+ * @author Siddharth Mishra (brightprogrammer)
+ * @date 04/27/22
+ * @brief Contains kernel entry code.
+ * @copyright MIT License 2022 Siddharth Mishra
+ * */
+
 // we can't include most of the headers
 // only selected headers ans others require libc
 // which we won't have when our kernel boots up
@@ -8,6 +16,7 @@
 #include "stivale2.h"
 #include "Common.hpp"
 #include "Renderer.hpp"
+#include "Printf.hpp"
 
 // placeholder for NULL value in uintptr_t instead of using 0 again and again
 #define NULLADDR 0
@@ -110,7 +119,8 @@ extern "C" { // stop compiler from mangling function name
         // load framebuffer info
         LoadFramebufferInfo(framebuffer_tag);
 
-        DrawString("Moss Operating System!", 10, 10);
+        uint32_t x = 0xcafebabe;
+        Printf("Moss Operating System. \nHexadecimal and Printf check (this must print 0xcafebabe) : 0x%x", x);
 
         // We're done, just hang...
         Halt();

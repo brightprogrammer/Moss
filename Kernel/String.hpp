@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include "Common.hpp"
 
 /**
  * @brief Get the size of a null terminated C String.
@@ -35,20 +36,20 @@ const char* itostr(int64_t n);
  * @param n Integer to convert to string.
  * @return pointer to string.
  * */
-const char* utostr(uint64_t n);
+const char* utostr(u64 n);
 
-// convert uint64_t to hex string, no 0x prefix is given
+// convert u64 to hex string, no 0x prefix is given
 /**
- * @brief Convert given uint64_t value to hexadecimal string.
+ * @brief Convert given u64 value to hexadecimal string.
  * This can take signed integer as input too because hex values are same.
  *
  * @param n Integer to get hex string for.
  * @return pointer to hex string.
  * */
-const char* utohexstr(uint64_t n);
+const char* utohexstr(u64 n);
 
 // NOTE : the memory checks are not always byte by byte
-// sometimes memory checks use uint64_t values too!
+// sometimes memory checks use u64 values too!
 // so don't assume the interface to be same as std C/C++ interface
 
 /**
@@ -170,5 +171,14 @@ char toupper(char c);
  * */
 char tolower(char c);
 
-
+/**
+ * @brief String printf for kernel.
+ *
+ * @param buff Buffer to print string into.
+ * @param fmtstr Format string.
+ * @param arguments Other arguments as specified in fmtstr.
+ * @return length of final string.
+ * */
+u32 __attribute__((format(printf, 2, 3)))
+sprintf(char* buff, const char* fmtstr, ...);
 #endif // STRING_H_

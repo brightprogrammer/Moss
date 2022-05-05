@@ -8,6 +8,7 @@
  * */
 
 #include "String.hpp"
+#include <cstdarg>
 
 static char int_to_string_buffer[128] = {0};
 
@@ -21,12 +22,12 @@ size_t strlen(const char* str){
     return sz;
 }
 
-// convert uint64_t to string
+// convert u64 to string
 const char* itostr(int64_t n){
     // get size of string
-    uint8_t digits = 1;
+    u8 digits = 1;
 
-    uint8_t is_negative = 0;
+    u8 is_negative = 0;
     if(n < 0){
         is_negative = 1;
     }
@@ -52,11 +53,11 @@ const char* itostr(int64_t n){
     return int_to_string_buffer;
 }
 
-// convert uint64_t to string
-const char* utostr(uint64_t n){
+// convert u64 to string
+const char* utostr(u64 n){
     // get size of string
-    uint8_t digits = 1;
-    uint64_t x = n;
+    u8 digits = 1;
+    u64 x = n;
     while ((x /= 10) > 0)
         digits++;
 
@@ -73,11 +74,11 @@ const char* utostr(uint64_t n){
     return int_to_string_buffer;
 }
 
-// convert uint64_t to hex string
-const char* utohexstr(uint64_t n){
+// convert u64 to hex string
+const char* utohexstr(u64 n){
     // calculate size of hex string
-    uint8_t size = 0;
-    uint64_t x = n;
+    u8 size = 0;
+    u64 x = n;
     while(x){
         x >>= 4;
         size++;
@@ -95,7 +96,7 @@ const char* utohexstr(uint64_t n){
         }
 
         // get lowest nibble and convert it to corresponding hex value
-        uint8_t nibble = (uint8_t)x & 0x0f;
+        u8 nibble = (u8)x & 0x0f;
         int_to_string_buffer[i] = hex_digits[nibble];
         x = x >> 4;
     }
@@ -116,8 +117,8 @@ int64_t memcmp(const void* m1, const void* m2, size_t n){
 
     if(n > 8){
         // check remainder (remainder after dividing by 8) bytes
-        const uint8_t* u8m1 = reinterpret_cast<const uint8_t*>(m1);
-        const uint8_t* u8m2 = reinterpret_cast<const uint8_t*>(m2);
+        const u8* u8m1 = reinterpret_cast<const u8*>(m1);
+        const u8* u8m2 = reinterpret_cast<const u8*>(m2);
         size_t i = 0;
         for(i = 0; i < n % 8; i++){
             if(u8m1[i] != u8m2[i]) return (u8m1[i] - u8m2[i]);
@@ -125,15 +126,15 @@ int64_t memcmp(const void* m1, const void* m2, size_t n){
 
         // comparing 8 bytes at once will be faster since 64 bit register will
         // be used at once, this means less looping
-        const uint64_t* u64m1 = reinterpret_cast<const uint64_t*>(u8m1 + i);
-        const uint64_t* u64m2 = reinterpret_cast<const uint64_t*>(u8m2 + i);
+        const u64* u64m1 = reinterpret_cast<const u64*>(u8m1 + i);
+        const u64* u64m2 = reinterpret_cast<const u64*>(u8m2 + i);
         for(i = 0; i < n / 8 ; i++){
             if(u64m1[i] != u64m2[i]) return (u64m1[i] - u64m2[i]);
         }
     }else{
         // check remainder bytes
-        const uint8_t* u8m1 = reinterpret_cast<const uint8_t*>(m1);
-        const uint8_t* u8m2 = reinterpret_cast<const uint8_t*>(m2);
+        const u8* u8m1 = reinterpret_cast<const u8*>(m1);
+        const u8* u8m2 = reinterpret_cast<const u8*>(m2);
         size_t i = 0;
         for(i = 0; i < n; i++){
             if(u8m1[i] != u8m2[i]) return (u8m1[i] - u8m2[i]);
@@ -147,7 +148,7 @@ int64_t memcmp(const void* m1, const void* m2, size_t n){
 template<typename t>
 t repeat_expand(char c){
     if(sizeof(t) == 64){
-        return (c | c << 8 | c << 16 | c << 24 | uint64_t(c) << 32 | uint64_t(c) << 48 |  uint64_t(c) << 56);
+        return (c | c << 8 | c << 16 | c << 24 | u64(c) << 32 | u64(c) << 48 |  u64(c) << 56);
     } else if (sizeof(t) == 32){
         return (c | c << 8 | c << 16 | c << 24);
     } else if (sizeof(t) == 16){
@@ -158,7 +159,7 @@ t repeat_expand(char c){
 }
 
 // memset
-void* memset(void* dst, uint8_t c, size_t n){
+void* memset(void* dst, u8 c, size_t n){
     // Algorithm
     // Try to write 8 bytes at once or 4 bytes or 2 bytes if possible.
     // If not possible then either write byte by byte for whole memory
@@ -166,21 +167,21 @@ void* memset(void* dst, uint8_t c, size_t n){
 
     if(n > 8){
         // set remainder bytes in the beginning to given byte
-        uint8_t* u8dst = reinterpret_cast<uint8_t*>(dst);
+        u8* u8dst = reinterpret_cast<u8*>(dst);
         size_t i = 0;
         for(i = 0; i < n % 8; i++){
             u8dst[i] = c;
         }
 
         // memsetting 8 bytes at once will be faster
-        uint64_t* u64dst = reinterpret_cast<uint64_t*>(u8dst + i);
-        uint64_t C = repeat_expand<uint64_t>(c);
+        u64* u64dst = reinterpret_cast<u64*>(u8dst + i);
+        u64 C = repeat_expand<u64>(c);
         for(i = 0; i < n / 8 ; i++){
             u64dst[i] = C;
         }
     }else{
         // if less than 8 then just use byte by byte method
-        uint8_t* u8dst = reinterpret_cast<uint8_t*>(dst);
+        u8* u8dst = reinterpret_cast<u8*>(dst);
         for(size_t i = 0; i < n; i++){
             u8dst[i] = c;
         }
@@ -195,23 +196,23 @@ void* memcpy(void *dst, const void* src, size_t n){
 
     if(n >= 8){
         // set remainder bytes in the beginning to given byte
-        const uint8_t* u8src = reinterpret_cast<const uint8_t*>(src);
-        uint8_t* u8dst = reinterpret_cast<uint8_t*>(dst);
+        const u8* u8src = reinterpret_cast<const u8*>(src);
+        u8* u8dst = reinterpret_cast<u8*>(dst);
         size_t i = 0;
         for(i = 0; i < n % 8; i++){
             u8dst[i] = u8src[i];
         }
 
         // memsetting 8 bytes at once will be faster
-        const uint64_t* u64src = reinterpret_cast<const uint64_t*>(u8src + i);
-        uint64_t* u64dst = reinterpret_cast<uint64_t*>(u8dst + i);
+        const u64* u64src = reinterpret_cast<const u64*>(u8src + i);
+        u64* u64dst = reinterpret_cast<u64*>(u8dst + i);
         for(i = 0; i < n / 8 ; i++){
             u64dst[i] = u64src[i];
         }
     }else{
         // if less than 8 then just use byte by byte method
-        const uint8_t* u8src = reinterpret_cast<const uint8_t*>(src);
-        uint8_t* u8dst = reinterpret_cast<uint8_t*>(dst);
+        const u8* u8src = reinterpret_cast<const u8*>(src);
+        u8* u8dst = reinterpret_cast<u8*>(dst);
         for(size_t i = 0; i < n; i++){
             u8dst[i] = u8src[i];
         }
@@ -293,4 +294,108 @@ bool isalpha(char c){
 // check if alphabet or number
 bool isalphanum(char c){
     return isalpha(c) || isdigit(c);
+}
+
+u32 __attribute__((format(printf, 2, 3)))
+sprintf(char* buff, const char* fmtstr, ...){
+    va_list vl;
+    int i = 0, finalstrsz = 0;
+    va_start(vl, fmtstr);
+
+    while(fmtstr && fmtstr[i]){
+        // check if any format specifier is present
+        if(fmtstr[i] == '%'){
+            i++;
+
+            // start checkinf format specifiers one by one
+            switch(fmtstr[i]){
+                // print character
+                case 'c': {
+                    buff[finalstrsz] = static_cast<char>(va_arg(vl, int));
+                    finalstrsz++;
+                    break;
+                }
+
+                // print long values
+                case 'l':{
+                    i++;
+
+                    switch(fmtstr[i]){
+                        // print signed integer
+                        case 'i':{
+                            const char* tmp = nullptr;
+                            tmp = itostr(va_arg(vl, int64_t));
+                            strcpy(&buff[finalstrsz], tmp);
+                            finalstrsz += strlen(tmp);
+                            break;
+                        }
+
+                        // print unsigned integer
+                        case 'u':{
+                            const char* tmp = nullptr;
+                            tmp = utostr(va_arg(vl, u64));
+                            strcpy(&buff[finalstrsz], tmp);
+                            finalstrsz += strlen(tmp);
+                            break;
+                        }
+
+                        // print hex value
+                        case 'x':{
+                            const char* tmp = nullptr;
+                            tmp = utohexstr(va_arg(vl, int64_t));
+                            strcpy(&buff[finalstrsz], tmp);
+                            finalstrsz += strlen(tmp);
+                            break;
+                        }
+
+                        default: break;
+                    }
+                }
+
+                // print integer
+                case 'i':{
+                    const char* tmp = nullptr;
+                    tmp = itostr(va_arg(vl, int32_t));
+                    strcpy(&buff[finalstrsz], tmp);
+                    finalstrsz += strlen(tmp);
+                    break;
+                }
+
+                // print integer
+                case 'u':{
+                    const char* tmp = nullptr;
+                    tmp = utostr(va_arg(vl, u32));
+                    strcpy(&buff[finalstrsz], tmp);
+                    finalstrsz += strlen(tmp);
+                    break;
+                }
+
+                case 'x':{
+                    const char* tmp = nullptr;
+                    tmp = utohexstr(va_arg(vl, u32));
+                    strcpy(&buff[finalstrsz], tmp);
+                    finalstrsz += strlen(tmp);
+                    break;
+                }
+
+                case 's':{
+                    char* tmp = va_arg(vl, char*);
+                    strcat(buff, tmp);
+                    finalstrsz += strlen(tmp);
+                    break;
+                }
+            }
+        }else{
+            buff[finalstrsz] = fmtstr[i];
+            finalstrsz++;
+        }
+
+        i++;
+    }
+
+    // null terminate final string
+    buff[finalstrsz] = 0;
+
+    va_end(vl);
+    return finalstrsz;
 }

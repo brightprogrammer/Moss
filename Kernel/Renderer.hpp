@@ -13,10 +13,13 @@
 #include "Common.hpp"
 #include "stivale2.h"
 
+#define DEFAULT_FGCOLOR 0xffffffff
+#define DEFAULT_BGCOLOR 0
+
 // export framebuffer information
-extern uint32_t FRAMEBUFFER_WIDTH;
-extern uint32_t FRAMEBUFFER_HEIGHT;
-extern uint32_t FRAMEBUFFER_PITCH;
+extern u32 FRAMEBUFFER_WIDTH;
+extern u32 FRAMEBUFFER_HEIGHT;
+extern u32 FRAMEBUFFER_PITCH;
 
 /**
  * @brief Helper function to generate color value from
@@ -27,7 +30,7 @@ extern uint32_t FRAMEBUFFER_PITCH;
  * @param b Blue color component (0-255)
  * @param a Alpha component (0-255)
  * */
-inline uint32_t Color(uint8_t r, uint8_t g, uint8_t b, uint8_t a){
+inline u32 Color(uint8_t r, uint8_t g, uint8_t b, uint8_t a){
     return r << 24 | g << 16 | b << 8 | a;
 }
 
@@ -52,9 +55,9 @@ void LoadFramebufferInfo(stivale2_struct_tag_framebuffer* fb_tag);
  * @param stopx Stopping X Coordinate of rectangle. 0 Means complete width.
  * @param stopy Stopping Y Coordinate of rectangle. 0 Means complete height.
  * */
-void ClearScreen(uint32_t color = 0,
-                 uint32_t startx = 0, uint32_t starty = 0,
-                 uint32_t stopx = 0, uint32_t stopy = 0);
+void ClearScreen(u32 color = 0,
+                 u32 startx = 0, u32 starty = 0,
+                 u32 stopx = 0, u32 stopy = 0);
 
 /**
  * @brief Draw a character on screen.
@@ -65,9 +68,9 @@ void ClearScreen(uint32_t color = 0,
  * @param fgColor Foreground color. Color of text.
  * @param bgColor Background Color. Color of background of text.
  * */
-void DrawCharacter(char c, uint32_t& x, uint32_t& y,
-                   uint32_t fgColor = Color(0xff, 0xff, 0xff, 0xff), // white
-                   uint32_t bgColor = Color(0, 0, 0, 0)); // black
+void DrawCharacter(char c, u32& x, u32& y,
+                   u32 fgColor = Color(0xff, 0xff, 0xff, 0xff), // white
+                   u32 bgColor = Color(0, 0, 0, 0)); // black
 
 /**
  * @brief Draw string on screen. Note that this function takes x and y
@@ -77,10 +80,11 @@ void DrawCharacter(char c, uint32_t& x, uint32_t& y,
  * @param string String to draw onto screen
  * @param x X coordinate of where to start drawing from.
  * @param y Y coordinate of where to start drawing from.
- * @param wrap Whether to wrap string to new line if cursor
- * reaches end of line. By default line wrap is enabled.
- * screen width during drawing.
+ * @param fgColor Foreground color of string drawn.
+ * @param bgColor Background color of string drawn.
  * */
-void DrawString(const char* string, uint32_t& x, uint32_t& y, bool wrap = true);
+void DrawString(const char* string, u32& x, u32& y,
+                u32 fgColor = DEFAULT_FGCOLOR,
+                u32 bgColor = DEFAULT_BGCOLOR);
 
 #endif // RENDERER_H_

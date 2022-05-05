@@ -17,6 +17,7 @@
 #include "Common.hpp"
 #include "Renderer.hpp"
 #include "Printf.hpp"
+#include "GDT.hpp"
 
 // placeholder for NULL value in uintptr_t instead of using 0 again and again
 #define NULLADDR 0
@@ -101,6 +102,8 @@ void  Halt(){
     }
 }
 
+
+
 // The following will be our kernel's entry point.
 extern "C" { // stop compiler from mangling function name
     void KernelEntry(struct stivale2_struct *stivale2_struct) {
@@ -118,9 +121,11 @@ extern "C" { // stop compiler from mangling function name
 
         // load framebuffer info
         LoadFramebufferInfo(framebuffer_tag);
+        Printf("Welcome Moss Operating System\n");
 
-        uint32_t x = 0xcafebabe;
-        Printf("Moss Operating System. \nHexadecimal and Printf check (this must print 0xcafebabe) : 0x%x", x);
+        // install gdt
+        InstallGDT();
+        ColorPrintf(COLOR_GREEN, 0, "[+] Install Global Descriptor Table\n");
 
         // We're done, just hang...
         Halt();

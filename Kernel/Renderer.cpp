@@ -7,14 +7,15 @@
  * @copyright MIT License 2022 Siddharth Mishra
  * */
 
+#include "Common.hpp""
 #include "Renderer.hpp"
 #include "String.hpp"
 
 // framebuffer info
-uint32_t FRAMEBUFFER_WIDTH = 0;
-uint32_t FRAMEBUFFER_HEIGHT = 0;
-uint32_t FRAMEBUFFER_PITCH = 0;
-uint32_t* framebuffer = 0;
+u32 FRAMEBUFFER_WIDTH = 0;
+u32 FRAMEBUFFER_HEIGHT = 0;
+u32 FRAMEBUFFER_PITCH = 0;
+u32* framebuffer = 0;
 
 uint8_t FONT_WIDTH = 8;
 uint8_t FONT_HEIGHT = 8;
@@ -285,23 +286,23 @@ void LoadFramebufferInfo(stivale2_struct_tag_framebuffer* fb_tag){
     FRAMEBUFFER_WIDTH = fb_tag->framebuffer_width;
     FRAMEBUFFER_HEIGHT = fb_tag->framebuffer_height;
     FRAMEBUFFER_PITCH = fb_tag->framebuffer_pitch;
-    framebuffer = reinterpret_cast<uint32_t*>(fb_tag->framebuffer_addr);
+    framebuffer = reinterpret_cast<u32*>(fb_tag->framebuffer_addr);
 }
 
 // clear a rectangle on sreen with given color
-void ClearScreen(uint32_t color,
-                 uint32_t startx, uint32_t starty,
-                 uint32_t stopx, uint32_t stopy){
-    for(uint32_t r = starty; r <= stopy; r++){
-        for(uint32_t c = startx; c <= stopx; c++){
+void ClearScreen(u32 color,
+                 u32 startx, u32 starty,
+                 u32 stopx, u32 stopy){
+    for(u32 r = starty; r <= stopy; r++){
+        for(u32 c = startx; c <= stopx; c++){
             framebuffer[r * FRAMEBUFFER_WIDTH + c] = color;
         }
     }
 }
 
 // draw character on screen at given posn
-void DrawCharacter(char c, uint32_t& x, uint32_t& y,
-                   uint32_t fgColor, uint32_t bgColor){
+void DrawCharacter(char c, u32& x, u32& y,
+                   u32 fgColor, u32 bgColor){
     // asm code to jump to same position again and again
     // asm volatile (".byte 0xeb, 0xef");
 
@@ -341,11 +342,11 @@ void DrawCharacter(char c, uint32_t& x, uint32_t& y,
     uint8_t* font_bitmap = FONT_DATA + c * FONT_HEIGHT;
 
     // draw char
-    for(uint32_t i = 0; i < FONT_HEIGHT; i++){
+    for(u32 i = 0; i < FONT_HEIGHT; i++){
         uint8_t row_bitmap = font_bitmap[i];
-        for(uint32_t j = 0; j < FONT_WIDTH; j++){
+        for(u32 j = 0; j < FONT_WIDTH; j++){
             // calculate write address
-            uint32_t write_addr = (x + j) + (y + i) * FRAMEBUFFER_WIDTH;
+            u32 write_addr = (x + j) + (y + i) * FRAMEBUFFER_WIDTH;
 
             // if bit is set then fill foreground colour else fill background colour
             // 8 - j because of endianness. Bits are stored in little endian format
@@ -362,10 +363,11 @@ void DrawCharacter(char c, uint32_t& x, uint32_t& y,
 }
 
 // draw a given string at given position
-void DrawString(const char* str, uint32_t& x, uint32_t& y, bool wrap){
+void DrawString(const char* str, u32& x, u32& y,
+                u32 fgcolor, u32 bgColor){
     size_t len = strlen(str);
 
     for(size_t i = 0; i < len; i++){
-        DrawCharacter(str[i], x, y);
+        DrawCharacter(str[i], x, y, fgcolor, bgColor);
     }
 }

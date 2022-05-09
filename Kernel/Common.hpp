@@ -16,5 +16,9 @@ typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
 
+#define KB 1024
+#define MB 1024*KB
+#define GB 1024*MB
+#define TB 1024*GB
 
 #endif // COMMON_H_

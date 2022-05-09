@@ -1,0 +1,276 @@
+/**
+ * @file MemoryManger.cpp
+ * @author Siddharth Mishra (brightprogrammer)
+ * @date 05/08/22
+ * @brief Virtual and Physical Memory Manager. (MM. and VMM).
+ * @copyright MIT License 2022 Siddharth Mishra
+ * */
+
+#include "MemoryManager.hpp"
+#include "Printf.hpp"
+
+const u64 MEM_PHYS_OFFSET = 0xffff800000000000;
+const u64 PAGE_SIZE = 4*KB;
+
+// stores memory manager information
+struct MemoryManager{
+    bool is_initialized = false;
+
+    u64 free_memory = 0;
+    u64 used_memory = 0;
+    u64 reserved_memory = 0;
+    u64 total_memory = 0;
+
+    // array to store addresses of free pages
+    u64* page_stack = nullptr;
+    u64 page_stack_top = 0;
+
+    // total number of pages in memory
+    u64 total_page_count = 0;
+    u64 num_pages_used_by_stack = 0;
+    u64 page_stack_size = 0;
+
+    u64 mmap_entries_count = 0;
+    stivale2_mmap_entry* mmap_entries = nullptr;
+};
+
+// single static instance of memory manager
+static MemoryManager mm;
+
+/* ------------------ ALGORITHM EXPLANATION --------------------
+ *                STACK BASED MEMORY ALLOCATOR
+ *
+ * mm.page_stack here is an array that stores addresses of all pages
+ * that can be allocated.
+ * mm.used_page_stack here is an array that stores addresses of all pages
+ * that are allocated.
+ *
+ * mm.total_page_count is the maximum number of pages that
+ * can be allocated.
+ *
+ * mm.num_pages_used_by_stack is the number of pages used by
+ * used_page_stack and page_stack array.
+ *
+ * When a new page is to be allocated, first we check whether
+ * page_stack_top is non zero. The address is then searched
+ * in used pages stack to make sure no double allocation happens.
+ * If we can allocate pages then we return the page address from
+ * the top of stack and then mm.page_stack_top is then decreased
+ * and mm.used_page_stack_top is increased. Address of used page is
+ * pushed to top of used pages stack.
+ *
+ * When a page is to be freed, the given page is first searched
+ * in the used pages stack. If it is present in stack then the address
+ * is pushed to top of free pages stack and the entry in which
+ * the given page address was stored is set to 0 in used pages
+ * stack.
+ *
+ * This makes sure that there is no double free or double allocation.
+ *
+ * <----------- mm.page_stack_top ---------->
+ * ;----------------------------------------;--------------------;
+ * ; free pages ||||||||||||||||||||||||||||;|||||||| used pages ;
+ * ;----------------------------------------;--------------------;
+ *
+ *
+ * A system with 1GiB total memory will have 0.5MiB sized page_stack
+ * This means 1TiB memory will need only 512M stack size
+ * Space complexity : O(n)
+ * Time complexity : O(1)
+ *
+ * One of the cons of this algo is that this can cause fragmentation.
+ * To solve this we can sort the used and free stacks after a certain
+ * number of alloc and free.
+ *
+ * */
+
+u64 PhysicalToVirtualAddress(u64 addr){
+    return addr + MEM_PHYS_OFFSET;
+}
+
+u64 VirtualToPhysicalAddress(u64 addr){
+    return addr - MEM_PHYS_OFFSET;
+}
+
+void InitializePhysicalMemoryManager(stivale2_struct_tag_memmap* mmap){
+    if(mm.is_initialized){
+        return;
+    }
+
+    mm.mmap_entries_count = mmap->entries;
+    mm.mmap_entries = mmap->memmap;
+
+    // First step is to find the largest claimable block
+    // we'll keep our pages array at the beginning of the largest block
+    // We also have to find the total available memory
+    u64 largest_mem_block_base, largest_mem_block_size;
+    for(size_t i = 0; i < mm.mmap_entries_count; i++){
+        if(mm.mmap_entries[i].length > largest_mem_block_size){
+            largest_mem_block_base = mm.mmap_entries[i].base;
+            largest_mem_block_size = mm.mmap_entries[i].length;
+        }
+
+        // if memory is usable, then it's free
+        if(mm.mmap_entries[i].type == STIVALE2_MMAP_USABLE){
+            mm.free_memory += mm.mmap_entries[i].length;
+        }else{
+            mm.reserved_memory += mm.mmap_entries[i].length;
+        }
+    }
+
+    // Second step is to calculate the total size needed for the stack
+    // calculate the size of page stack
+    // page stack size is the number of pages that can be allocated
+    mm.total_page_count = mm.free_memory / PAGE_SIZE;
+    // calculate required numer of pages to allocate for stack
+    mm.num_pages_used_by_stack = ((mm.total_page_count * 8) / PAGE_SIZE) + 1;
+    mm.page_stack_size = mm.num_pages_used_by_stack * PAGE_SIZE;
+    // check if largest block can provide this much space or not
+    if(largest_mem_block_size <= mm.page_stack_size){
+        ColorPrintf(COLOR_RED, COLOR_BLACK, "[-] Insufficient memory to initialize PhysicalMemoryManager\n");
+        Printf("\tLargest memory block size : %li KB\n", (largest_mem_block_size / KB));
+        Printf("\tMemory required : %li KB\n", (mm.page_stack_size / KB));
+        while(true)asm("hlt");
+    }
+
+    // set page stacks at the start of this memory region
+    // create page_stack
+    mm.page_stack = reinterpret_cast<u64*>(PhysicalToVirtualAddress(largest_mem_block_base));
+
+    // mark this memory as used
+    mm.free_memory -= mm.page_stack_size;
+    mm.used_memory += mm.page_stack_size;
+
+    // Find usable page frames in small blocks first.
+    // If these pages are at the bottom of the stack then
+    // there is less chance of them being allocated.
+    for(size_t i = 0 ; i < mm.mmap_entries_count; i++){
+        // if this block is usable and not the largest block
+        if((mm.mmap_entries[i].type == STIVALE2_MMAP_USABLE) && // memory is usable
+           (mm.mmap_entries[i].base != largest_mem_block_base) && // not the lagest block
+           (mm.mmap_entries[i].length >= PAGE_SIZE)){ // has atleast 1 page
+
+            // start getting pages
+            u64 num_pages = mm.mmap_entries[i].length / PAGE_SIZE;
+            for(size_t j = 0; j < num_pages ; j++){
+                // if this page's limit is less than this block's limit then add it
+                if((mm.mmap_entries[i].base + (j + 1) * PAGE_SIZE) <= mm.mmap_entries[i].base + mm.mmap_entries[i].length){
+                    mm.page_stack[mm.page_stack_top] = PhysicalToVirtualAddress(mm.mmap_entries[i].base + (j * PAGE_SIZE));
+                    mm.page_stack_top++;
+                }
+            }
+        }
+    }
+
+    // Finally find available pages in largest memory block.
+    // make sure to exclude pages used by stacks
+    u64 start_address = largest_mem_block_base + mm.num_pages_used_by_stack * PAGE_SIZE;
+    u64 max_available_pages =  (largest_mem_block_size - (mm.num_pages_used_by_stack * PAGE_SIZE)) / PAGE_SIZE;
+
+    for(size_t i = 0; i < max_available_pages; i++){
+        // check if page's limit is less than memory block's limit
+        if((start_address + (i + 1) * PAGE_SIZE) <= (largest_mem_block_base + largest_mem_block_size)){
+            // limine already maps addresses to higher half
+            // so we have to add that offset to all page addresses
+            mm.page_stack[mm.page_stack_top] = PhysicalToVirtualAddress(start_address + (i * PAGE_SIZE));
+            mm.page_stack_top++;
+        }
+    }
+}
+
+void InitializeVirtualMemoryManager(stivale2_struct_tag_memmap* mmap){
+
+}
+
+u64 GetFreeMemory(){ return mm.free_memory; }
+u64 GetUsedMemory(){ return mm.used_memory; }
+u64 GetReservedMemory(){ return mm.reserved_memory; }
+u64 GetTotalMemory(){ return mm.free_memory + mm.used_memory + mm.reserved_memory; }
+
+// allocate's a single page
+// this pops out the top element from stack and returns the value
+u64 AllocatePage(){
+    if(mm.page_stack_top == 0){
+        Printf("Out Of Memory!");
+        while(true)asm("hlt");
+    }
+
+    mm.free_memory -= PAGE_SIZE;
+    mm.used_memory += PAGE_SIZE;
+
+    // get page addr
+    mm.page_stack_top--;
+    u64 page_vaddr = mm.page_stack[mm.page_stack_top];
+
+    return page_vaddr;
+}
+
+// allocate more than one pages at a time
+// max allowed size to allocate at a time is 512 pages
+// this is equivalent to 2MB memory at a time
+u64* AllocatePages(size_t n){
+    // n = 512 means 1 page
+    if(n <= 512){
+        // allocate memory for return array
+        u64* page_frames = reinterpret_cast<u64*>(AllocatePage());
+        // allocate requested number of pages and return the array
+        for(size_t i = 0 ; i < n; i++){
+            page_frames[i] = AllocatePage();
+        }
+
+        return page_frames;
+    }
+
+    return nullptr;
+}
+
+// free a single page
+void FreePage(u64 page_vaddr){
+    // check that such memory actually exists
+    bool freeable = false;
+
+    // first search whether this page was already allocated or not
+    u64 posn = 0;
+    for(size_t i = mm.page_stack_top; i < mm.page_stack_size; i++){
+        if(mm.page_stack[i] == page_vaddr){
+            posn = i;
+            freeable = true;
+        }
+    }
+
+    // free memory
+    if(freeable){
+        u64 temp = mm.page_stack[posn];
+        mm.page_stack[posn] = mm.page_stack[mm.page_stack_top];
+        mm.page_stack[mm.page_stack_top] = temp;
+
+        // mm.page_stack[mm.page_stack_top] = page_vaddr;
+        mm.page_stack_top++;
+        mm.used_memory -= PAGE_SIZE;
+        mm.free_memory += PAGE_SIZE;
+    }else{
+        Printf("Attemt to free a reserved page! : Address = %lx\n", PhysicalToVirtualAddress(page));
+    }
+}
+
+// free pages at addresses stored at the value provided in the element of
+// this pages array
+void FreePages(u64 *pages, size_t n){
+    if(n <= 512){
+        for(size_t i = 0; i < n; i++){
+            FreePage(pages[i]);
+        }
+    }else{
+        Printf("Call to free pages with size greater than max allowed size");
+    }
+}
+
+// print memmoy statistics
+void ShowStatistics(){
+    ColorPrintf(COLOR_YELLOW, COLOR_BLACK, "[+] Memory Stats : \n");
+    Printf("\tFree Memory : %lu KB\n", (mm.free_memory/KB));
+    Printf("\tUsed Memory : %lu KB\n", (mm.used_memory/KB));
+    Printf("\tReserved Memory : %lu KB\n", (mm.reserved_memory/KB));
+    Printf("\tFree Pages : %lu pages\n", (mm.page_stack_top));
+    Printf("\tTotal Pages : %lu pages\n", (mm.total_memory));
+}

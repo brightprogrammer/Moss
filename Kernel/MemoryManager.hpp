@@ -12,7 +12,7 @@
 #include <cstdint>
 #include <cstddef>
 
-#include "stivale2.h"
+#include "stivale2.hpp"
 #include "Common.hpp"
 
 extern const u64 MEM_PHYS_OFFSET;
@@ -109,6 +109,64 @@ u64 GetTotalMemory();
 /**
  * @brief Display memory statistics.
  * */
-void ShowStatistics();
+void ShowMemoryStatistics();
+
+/**
+ * @brief Different page flags that can be used while mapping
+ * a physical address to new virtual address.
+ * */
+enum PageFlags {
+    MAP_PRESENT = 1 << 0,
+    MAP_READ_WRITE = 1 << 1,
+    MAP_SUPERVISOR_ONLY = 1 << 2,
+    MAP_WRITE_THROUGH = 1 << 3,
+    MAP_CACHE_DISABLED = 1 << 4,
+    MAP_ACCESSED = 1 << 5,
+    MAP_LARGER_PAGES =  1 << 7,
+    MAP_CUSTOM0 = 1 << 9,
+    MAP_CUSTOM1 = 1 << 10,
+    MAP_CUSTOM2 = 1 << 11,
+    MAP_NO_EXECUTE = uint64_t(1) << 63 // only if supported
+};
+
+/**
+ * @brief This represents a single entry (node) in a page table level.
+ * */
+struct Page {
+    uint64_t value; //
+    // set given flags to true
+    void SetFlags(uint64_t flags);
+    // set given flags to false
+    void UnsetFlags(uint64_t flags);
+    // if given flags are true then true is returned
+    bool GetFlags(uint64_t flags);
+    // set physical address
+    void SetAddress(uint64_t address);
+    // get physical address (4kb aligned always)
+    uint64_t GetAddress();
+};
+
+
+// page table and page map level 4 use the same structure
+struct PageTable {
+    Page entries[512];
+} __attribute__((aligned(0x1000)));
+
+
+/**
+ * @brief Map a physical address to given virtual address.
+ *
+ * @param vaddr Virtual address to map to.
+ * @param paddr Physical address to map to.
+ * @param flags Flags of mapped address.
+ * */
+void MapMemory(u64 vaddr, u64 paddr, u64 flags);
+
+/**
+ * @brief Unmap memory mapped for given virtual address.
+ *
+ * @param vaddr Virtual address of mapped memory.
+ * */
+void UnmapMemory(u64 vaddr);
 
 #endif // MEMORYMANAGER_H_

@@ -48,3 +48,33 @@ u32 __attribute__((format(printf, 3, 4))) ColorPrintf(u32 fgColor, u32 bgColor, 
 
     return finalstrsz;
 }
+
+
+// draw a string without any formatting
+void Puts(const char* str){
+    DrawString(str, xpos, ypos);
+}
+
+// puts but with a color
+void ColorPuts(uint32_t fgcolor, uint32_t bgcolor, const char* str){
+    // draw with new colors
+    DrawString(str, xpos, ypos, fgcolor, bgcolor);
+}
+
+// draw a string without any formatting
+void PutChar(char c){
+    if(!c){
+        return;
+    }
+
+    DrawCharacter(c, xpos, ypos);
+}
+
+// puts but with a color
+void ColorPutChar(uint32_t fgcolor, uint32_t bgcolor, char c){
+    if(!c){
+        return;
+    }
+    // draw with new colors
+    DrawCharacter(c, xpos, ypos, fgcolor, bgcolor);
+}

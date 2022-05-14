@@ -21,4 +21,7 @@ typedef int64_t i64;
 #define GB 1024*MB
 #define TB 1024*GB
 
+// hang CPU indefinitely
+void InfiniteHalt();
+
 #endif // COMMON_H_

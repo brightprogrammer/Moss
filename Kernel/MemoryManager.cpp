@@ -8,9 +8,19 @@
 
 #include "MemoryManager.hpp"
 #include "Printf.hpp"
+#include "String.hpp"
 
-const u64 MEM_PHYS_OFFSET = 0xffff800000000000;
-const u64 PAGE_SIZE = 4*KB;
+// virtual address where all address are mapped
+constexpr u64 MEM_PHYS_OFFSET = 0xffff800000000000;
+
+// size of one page of memory
+constexpr u64 PAGE_SIZE = 4*KB;
+
+// address mask where physical address is stored in a page table entry
+constexpr u64 PAGE_PHYSICAL_ADDRESS_MASK = 0x000ffffffffff000;
+
+// virtual address where kernel is mapped
+constexpr u64 KERNEL_VIRT_BASE = 0xffffffff80000000;
 
 // stores memory manager information
 struct MemoryManager{
@@ -32,6 +42,13 @@ struct MemoryManager{
 
     u64 mmap_entries_count = 0;
     stivale2_mmap_entry* mmap_entries = nullptr;
+
+
+    // this is called pml4 because Moss uses
+    // 4 level of paging. Some operating systems use 5 level paging.
+    // More levels of paging means more addresses can be mapped.
+    PageTable* pml4 = nullptr;
+    u64 pml4_paddr = 0;
 };
 
 // single static instance of memory manager
@@ -84,12 +101,12 @@ static MemoryManager mm;
  *
  * */
 
-u64 PhysicalToVirtualAddress(u64 addr){
-    return addr + MEM_PHYS_OFFSET;
+u64 PhysicalToVirtualAddress(u64 paddr){
+    return paddr + MEM_PHYS_OFFSET;
 }
 
-u64 VirtualToPhysicalAddress(u64 addr){
-    return addr - MEM_PHYS_OFFSET;
+u64 VirtualToPhysicalAddress(u64 vaddr){
+    return vaddr - MEM_PHYS_OFFSET;
 }
 
 void InitializePhysicalMemoryManager(stivale2_struct_tag_memmap* mmap){
@@ -103,7 +120,7 @@ void InitializePhysicalMemoryManager(stivale2_struct_tag_memmap* mmap){
     // First step is to find the largest claimable block
     // we'll keep our pages array at the beginning of the largest block
     // We also have to find the total available memory
-    u64 largest_mem_block_base, largest_mem_block_size;
+    u64 largest_mem_block_base = 0, largest_mem_block_size = 0;
     for(size_t i = 0; i < mm.mmap_entries_count; i++){
         if(mm.mmap_entries[i].length > largest_mem_block_size){
             largest_mem_block_base = mm.mmap_entries[i].base;
@@ -178,10 +195,6 @@ void InitializePhysicalMemoryManager(stivale2_struct_tag_memmap* mmap){
     }
 }
 
-void InitializeVirtualMemoryManager(stivale2_struct_tag_memmap* mmap){
-
-}
-
 u64 GetFreeMemory(){ return mm.free_memory; }
 u64 GetUsedMemory(){ return mm.used_memory; }
 u64 GetReservedMemory(){ return mm.reserved_memory; }
@@ -240,6 +253,42 @@ void FreePage(u64 page_vaddr){
 
     // free memory
     if(freeable){
+        /*
+         *  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% BEFORE FREEING %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+         *
+         *                  unfreed memory
+         *                        |
+         *                        | /----------------> page stack top
+         *                        |/
+         *                        v
+         * ;---------------------;-------;
+         * ; | | | | | | | | | | |%|%|%|%|
+         * ;---------------------;-------;
+         *                            ^
+         *                            |
+         *                            |
+         *                   memory to be freed
+         *
+         *  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% AFTER FREEING %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+         *
+         *                   freed memory
+         *                        |
+         *                        | ;----------------> new stack top
+         *                        | |
+         *                        v v
+         * ;-----------------------;-----;
+         * ; | | | | | | | | | | | |%|%|%|
+         * ;-----------------------;-----;
+         *                            ^
+         *                            |
+         *                            |
+         *                    swapped memory
+         *
+         *
+         *
+         * */
+
+        // swap freed memory with non freed memory
         u64 temp = mm.page_stack[posn];
         mm.page_stack[posn] = mm.page_stack[mm.page_stack_top];
         mm.page_stack[mm.page_stack_top] = temp;
@@ -249,7 +298,7 @@ void FreePage(u64 page_vaddr){
         mm.used_memory -= PAGE_SIZE;
         mm.free_memory += PAGE_SIZE;
     }else{
-        Printf("Attemt to free a reserved page! : Address = %lx\n", PhysicalToVirtualAddress(page));
+        Printf("Attemt to free a reserved page! : Address = %lx\n", PhysicalToVirtualAddress(page_vaddr));
     }
 }
 
@@ -266,11 +315,202 @@ void FreePages(u64 *pages, size_t n){
 }
 
 // print memmoy statistics
-void ShowStatistics(){
+void ShowMemoryStatistics(){
     ColorPrintf(COLOR_YELLOW, COLOR_BLACK, "[+] Memory Stats : \n");
     Printf("\tFree Memory : %lu KB\n", (mm.free_memory/KB));
     Printf("\tUsed Memory : %lu KB\n", (mm.used_memory/KB));
     Printf("\tReserved Memory : %lu KB\n", (mm.reserved_memory/KB));
     Printf("\tFree Pages : %lu pages\n", (mm.page_stack_top));
     Printf("\tTotal Pages : %lu pages\n", (mm.total_memory));
+}
+
+// turn on given flags
+void Page::SetFlags(u64 flags){
+    value |= flags;
+}
+
+// turn off given flags
+void Page::UnsetFlags(u64 flags){
+    value &= (~flags | PAGE_PHYSICAL_ADDRESS_MASK);
+}
+
+// get state of given flags
+bool Page::GetFlags(u64 flags){
+    return (value & flags) > 0 ? true : false;
+}
+
+// get address of this mapped page
+u64 Page::GetAddress(){
+    // physical address is 40 bits only
+    return (value & PAGE_PHYSICAL_ADDRESS_MASK) >> 12;
+}
+
+// set address of this page
+void Page::SetAddress(u64 address){
+    // unset address first
+    value &= ~PAGE_PHYSICAL_ADDRESS_MASK;
+    // set address
+    value |= (address << 12) & PAGE_PHYSICAL_ADDRESS_MASK;
+}
+
+// get next level of paging
+PageTable* GetNextLevel(PageTable* ptable, u64 entry_index, bool allocate){
+    Page* pte = &ptable->entries[entry_index];
+    PageTable* pt = nullptr;
+
+    // if page directory entry is not present and allocation is allowed, then allocate it
+    if(!pte->GetFlags(MAP_PRESENT)){
+        // if allocation isn't allowed then return nullptr
+        if(!allocate){
+            return nullptr;
+        }
+
+        // create page directory pointer
+        u64 vaddr = AllocatePage();
+        u64 paddr = VirtualToPhysicalAddress(vaddr);
+        pt = reinterpret_cast<PageTable*>(vaddr);
+        memset(reinterpret_cast<void*>(pt), 0, PAGE_SIZE);
+
+        // shift by 12 biits to align it to 0x1000 boundary
+        pte->SetAddress(paddr >> 12);
+        pte->SetFlags(MAP_PRESENT | MAP_READ_WRITE);
+    }else{
+        u64 paddr = pte->GetAddress() << 12;
+        u64 vaddr = PhysicalToVirtualAddress(paddr);
+        pt = reinterpret_cast<PageTable*>(vaddr);
+    }
+
+    return pt;
+}
+
+// get's you a single page corresponding to the given virtual address:w
+Page* GetPage(u64 vaddr, bool allocate){
+    // cache this value
+    u64 virtualAddr = vaddr;
+
+    // get page index
+    vaddr >>= 12;
+    u64 pageIndex = vaddr & 0x1ff; // 0x1ff = 511 or 512 - 1
+
+    // find table index
+    vaddr >>= 9;
+    u64 pml1Index = vaddr & 0x1ff;
+
+    // find page directory index
+    vaddr >>= 9;
+    u64 pml2Index = vaddr & 0x1ff;
+
+    // find page directory pointer index
+    vaddr >>= 9;
+    u64 pml3Index = vaddr & 0x1ff;
+
+    // get page directory pointer from PML4
+    PageTable* pml3 = GetNextLevel(mm.pml4, pml3Index, allocate);
+    if(pml3 == nullptr){
+        Printf("[-] PML3 for vaddr(%lx) doesn't exists or failed to allocate\n", virtualAddr);
+        return nullptr;
+    }
+
+    // get page directory from page directory pointer
+    PageTable* pml2 = GetNextLevel(pml3, pml2Index, allocate);
+    if(pml2 == nullptr){
+        Printf("[-] PML2 for vaddr(%lx) doesn't exists or failed to allocate\n", virtualAddr);
+        return nullptr;
+    }
+
+
+    // get page table from page directory
+    PageTable* pml1 = GetNextLevel(pml2, pml1Index, allocate);
+    if(pml1 == nullptr){
+        Printf("[-] PML1 for vaddr(%lx) doesn't exists or failed to allocate\n", virtualAddr);
+        return nullptr;
+    }
+
+
+    // get page from page table
+    Page *pte = &pml1->entries[pageIndex];
+    if(pte == nullptr){
+        Printf("[-] Page Table Entry for vaddr(%lx) doesn't exists or failed to allocate\n", virtualAddr);
+        return nullptr;
+    }
+
+    return pte;
+}
+
+// map given physical memory to virtual memory wiht given flags
+void MapMemory(u64 vaddr, u64 paddr, u64 flags){
+    // get page table entry
+    Page* pte = GetPage(vaddr, true);
+    if(pte == nullptr) return;
+
+    // map physical address 4kb aligned
+    pte->SetAddress(paddr >> 12);
+    pte->SetFlags(flags);
+}
+
+// create page map table by allocating a new array for it.
+void CreatePageMap(){
+    if(mm.pml4 == nullptr){
+        // create new page map
+        u64 pml4_vaddr = AllocatePage();
+        mm.pml4_paddr = VirtualToPhysicalAddress(pml4_vaddr);
+        mm.pml4 = reinterpret_cast<PageTable*>(pml4_vaddr);
+
+        // and set all elements to 0
+        memset(mm.pml4, 0, PAGE_SIZE);
+    }else{
+        Printf("[!] Attempt to recreate prexisting root level page map!\n");
+    }}
+
+// load page table in cr3 constrol register.
+void LoadPageTable(){
+    asm volatile("mov %0, %%cr3"
+                 :
+                 : "r" (mm.pml4_paddr)); // map takes
+}
+
+void InitializeVirtualMemoryManager(stivale2_struct_tag_memmap* mmap){
+    // create's page table root entry
+    CreatePageMap();
+
+    stivale2_mmap_entry* mmap_entry = mmap->memmap;
+    u64 mmap_count = mmap->entries;
+
+    // map first 4 gb of memory to higher half
+    // this memeory
+    // for(u64 p = 0; p < 4*GB; p += PAGE_SIZE){
+    //     MapMemory(MEM_PHYS_OFFSET + p, p, MAP_PRESENT | MAP_READ_WRITE);
+    // }
+
+    for(size_t i = 0; i < mmap_count; i++){
+        if(mmap_entry[i].type != STIVALE2_MMAP_KERNEL_AND_MODULES){
+            for(size_t p = 0; p < mmap_entry[i].length; p += PAGE_SIZE){
+                u64 paddr = mmap_entry[i].base + p;
+                u64 vaddr = PhysicalToVirtualAddress(paddr);
+                MapMemory(vaddr, paddr, MAP_PRESENT | MAP_READ_WRITE);
+            }
+        }else{
+            for(size_t p = 0; p < mmap_entry[i].length; p += PAGE_SIZE){
+                u64 paddr = mmap_entry[i].base + p;
+                u64 vaddr = KERNEL_VIRT_BASE + p;
+                MapMemory(vaddr, paddr, MAP_PRESENT | MAP_READ_WRITE);
+            }
+        }
+    }
+
+    // u64 krnlPhysBase = BootInfo::GetKernelPhysicalBase();
+    // for (uintptr_t p = 0; p < 2*GB; p += PAGE_SIZE){
+    //     u64 paddr = krnlPhysBase + p;
+    //     u64 vaddr = KERNEL_VIRT_BASE + p;
+    //     MapMemory(vaddr, paddr, MAP_PRESENT | MAP_READ_WRITE);
+    // }
+
+    // load page table into cr3 register
+    LoadPageTable();
+}
+
+// initialize memory manager
+void InitializeMemoryManager(stivale2_struct_tag_memmap* mmap){
+    InitializePhysicalMemoryManager(mmap);
+    InitializeVirtualMemoryManager(mmap);
 }

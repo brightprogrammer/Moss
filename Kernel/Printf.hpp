@@ -34,4 +34,13 @@ u32 __attribute__((format(printf, 1, 2))) Printf(const char* fmtstr, ...);
  * @return Number of bytes printed */
 u32 __attribute__((format(printf, 3, 4))) ColorPrintf(u32 fg, u32 bg, const char* fmtstr, ...);
 
+
+// puts doesn't add a new line here
+void Puts(const char* str);
+void ColorPuts(uint32_t fgcolor, uint32_t bgcolor, const char* str);
+
+void PutChar(char c);
+void ColorPutChar(char c);
+
+
 #endif // PRINTF_H_

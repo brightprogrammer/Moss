@@ -1,7 +1,8 @@
 # add all Kernel sources here
 # recurisve search may be slower sometimes so just hardcode filenames
 set(KERNEL_SRCS "KernelEntry.cpp" "Renderer.cpp" "String.cpp" "Printf.cpp"
-    "GDT.cpp")
+    "GDT.cpp" "MemoryManager.cpp" "Common.cpp" "stivale2.cpp"
+    "IDT.cpp" "IO.cpp" "Interrupts.cpp" "Keyboard.cpp" "PanicPrintf.cpp")
 
 # make Kernel as executable
 add_executable(Kernel ${KERNEL_SRCS})
@@ -31,7 +32,7 @@ target_link_options(Kernel PRIVATE  -fno-pic -fpie
                                     -z max-page-size=0x1000)
 
 
-# set_target_properties(Kernel PROPERTIES PUBLIC_HEADER "stivale2.h")
+# set_target_properties(Kernel PROPERTIES PUBLIC_HEADER "stivale2.hpp")
 
 # add install rules for this include dir
 # install(TARGETS Kernel PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_PREFIX}/Kernel)

@@ -370,4 +370,9 @@ struct stivale2_struct_tag_hhdm {
 
 #undef _stivale2_split64
 
+
+// We will now write a helper function which will allow us to scan for tags
+// that we want FROM the bootloader (structure tags).
+void *stivale2_get_tag(struct stivale2_struct *stivale2_struct, uint64_t id);
+
 #endif

@@ -6,8 +6,7 @@
   */
 
 #include "IDT.hpp"
-#include "PhysicalMemoryManager.hpp"
-#include "VirtualMemoryManager.hpp"
+#include "MemoryManager.hpp"
 #include "Interrupts.hpp"
 #include "Printf.hpp"
 
@@ -47,7 +46,7 @@ void InstallIDT(){
     idtr.limit = PAGE_SIZE - 1;
     // allocate page always returns virtual address
     // and if paging is enabled then offset must be the virtual address
-    idtr.offset = PhysicalMemoryManager::AllocatePage();
+    idtr.offset = AllocatePage();
 
     // divide by zero
     SetInterruptDescriptor(0x00, reinterpret_cast<uint64_t>(DefaultInterruptHandlerNoError), IDT_TYPE_ATTR_TRAP_GATE);
@@ -108,3 +107,4 @@ void InstallIDT(){
     asm volatile ("lidt %0"
                   :
                   : "m"(idtr));
+}

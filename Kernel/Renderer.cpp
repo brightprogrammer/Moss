@@ -7,9 +7,11 @@
  * @copyright MIT License 2022 Siddharth Mishra
  * */
 
-#include "Common.hpp""
+#include "Common.hpp"
 #include "Renderer.hpp"
 #include "String.hpp"
+
+#define TAB_WIDTH 4
 
 // framebuffer info
 u32 FRAMEBUFFER_WIDTH = 0;
@@ -19,6 +21,20 @@ u32* framebuffer = 0;
 
 uint8_t FONT_WIDTH = 8;
 uint8_t FONT_HEIGHT = 8;
+
+void InitializeRenderer(stivale2_struct* sysinfo_struct){
+    struct stivale2_struct_tag_framebuffer *framebuffer_tag = nullptr;
+    framebuffer_tag = (stivale2_struct_tag_framebuffer*)stivale2_get_tag(sysinfo_struct, STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
+
+    // Check if the tag was actually found.
+    if (framebuffer_tag == nullptr) {
+        // It wasn't found, just hang...
+        InfiniteHalt();
+    }
+
+    // load framebuffer info
+    LoadFramebufferInfo(framebuffer_tag);
+}
 
 uint8_t FONT_DATA[2048] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -279,7 +295,6 @@ uint8_t FONT_DATA[2048] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-#define TAB_WIDTH 4
 
 // load framebuffer info
 void LoadFramebufferInfo(stivale2_struct_tag_framebuffer* fb_tag){

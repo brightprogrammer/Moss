@@ -3,9 +3,10 @@
 ./build.sh
 qemu-system-x86_64           \
     moss.hdd                 \
-    -m 128                   \
+    -cpu core2duo            \
+    -m 512M                  \
     -no-reboot               \
     -no-shutdown             \
     -M smm=off               \
     -d int                   \
-#    -s -S
+#   -s -S

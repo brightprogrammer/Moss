@@ -13,11 +13,13 @@
 #include <stddef.h>
 
 // stivale 2 header specification
-#include "stivale2.h"
+#include "stivale2.hpp"
 #include "Common.hpp"
 #include "Renderer.hpp"
 #include "Printf.hpp"
 #include "GDT.hpp"
+#include "IDT.hpp"
+#include "MemoryManager.hpp"
 
 // placeholder for NULL value in uintptr_t instead of using 0 again and again
 #define NULLADDR 0
@@ -74,60 +76,36 @@ static struct stivale2_header stivale_hdr = {
 };
 
 
-// We will now write a helper function which will allow us to scan for tags
-// that we want FROM the bootloader (structure tags).
-void *stivale2_get_tag(struct stivale2_struct *stivale2_struct, uint64_t id) {
-    stivale2_tag *current_tag = (stivale2_tag*)stivale2_struct->tags;
-    for (;;) {
-        // If the tag pointer is NULL (end of linked list), we did not find
-        // the tag. Return NULL to signal this.
-        if (current_tag == NULL) {
-            return NULL;
-        }
-
-        // Check whether the identifier matches. If it does, return a pointer
-        // to the matching tag.
-        if (current_tag->identifier == id) {
-            return current_tag;
-        }
-
-        // Get a pointer to the next tag in the linked list and repeat.
-        current_tag = (stivale2_tag*)current_tag->next;
-    }
-}
-
-void  Halt(){
-    while(true){
-        asm("hlt");
-    }
-}
-
-
-
 // The following will be our kernel's entry point.
 extern "C" { // stop compiler from mangling function name
-    void KernelEntry(struct stivale2_struct *stivale2_struct) {
-        // Let's get the terminal structure tag from the bootloader.
-        // notice this is struct_tag and previous one was header_tag
-        // struct_tags are returned by bootloader and header_tags are used to request features from bootloader
-        struct stivale2_struct_tag_framebuffer *framebuffer_tag;
-        framebuffer_tag = (stivale2_struct_tag_framebuffer*)stivale2_get_tag(stivale2_struct, STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
-
-        // Check if the tag was actually found.
-        if (framebuffer_tag == NULL) {
-            // It wasn't found, just hang...
-            Halt();
-        }
-
-        // load framebuffer info
-        LoadFramebufferInfo(framebuffer_tag);
+    void KernelEntry(struct stivale2_struct *sysinfo_struct) {
+        InitializeRenderer(sysinfo_struct);
         Printf("Welcome Moss Operating System\n");
 
         // install gdt
         InstallGDT();
-        ColorPrintf(COLOR_GREEN, 0, "[+] Install Global Descriptor Table\n");
+        ColorPuts(COLOR_GREEN, COLOR_BLACK, "[+] Global Descriptor Table\n");
+
+        stivale2_struct_tag_memmap* mmap = nullptr;
+        mmap = (stivale2_struct_tag_memmap*)stivale2_get_tag(sysinfo_struct, STIVALE2_STRUCT_TAG_MEMMAP_ID);
+
+        // Check if the tag was actually found.
+        if (mmap == nullptr) {
+            // It wasn't found, just hang...
+            InfiniteHalt();
+        }
+
+        InitializeMemoryManager(mmap);
+        ColorPuts(COLOR_GREEN, COLOR_BLACK, "[+] Memory Manager\n");
+
+        InstallIDT();
+        ColorPuts(COLOR_GREEN, COLOR_BLACK, "[+] Interrupt Descriptor Table\n");
+
+        ColorPuts(COLOR_YELLOW, COLOR_BLACK, "[!] Generating intentional #PAGE_FAULT\n");
+        int* ptr = 0;
+        *ptr = 4;
 
         // We're done, just hang...
-        Halt();
+        InfiniteHalt();
     }
 }

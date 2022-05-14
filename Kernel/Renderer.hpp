@@ -11,7 +11,7 @@
 #define RENDERER_H_
 
 #include "Common.hpp"
-#include "stivale2.h"
+#include "stivale2.hpp"
 
 #define DEFAULT_FGCOLOR 0xffffffff
 #define DEFAULT_BGCOLOR 0
@@ -20,6 +20,14 @@
 extern u32 FRAMEBUFFER_WIDTH;
 extern u32 FRAMEBUFFER_HEIGHT;
 extern u32 FRAMEBUFFER_PITCH;
+
+/**
+ * @brief Initialize rendering abilities of Moss operating system
+ *
+ * @param sysinfo_struct System info struct provided by stivale compliant
+ * bootloader.
+ * */
+void InitializeRenderer(stivale2_struct* sysinfo_struct);
 
 /**
  * @brief Helper function to generate color value from
